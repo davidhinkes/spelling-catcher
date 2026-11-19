@@ -1,18 +1,44 @@
 {
   "manifest_version": 3,
   "name": "Spelling Catcher",
-  "version": "0.1.0",
-  "description": "Tracks the words you misspell and then correct, everywhere you type in Chrome. Everything stays local.",
-  "permissions": ["storage", "activeTab"],
-  "background": { "service_worker": "background.js" },
+  "version": "0.2.0",
+  "description": "Learns the words you misspell and then fix, and keeps a running list in a Google Sheet in your Drive.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm195J8lWPl4uBRxc/KIhOCosO7HKmKH/ftzrQdUXal9PansM2t+OKMn+96xloLIPyOsVq+VSWExGhxFB9kdXX6QL6phnEuoI+3H2l52MVIpe/PUdoDXiEwaLc3r0hmsec7yANJcF+/uaBmR+uU6DPzb7bC7eN5r4zgXIVFOc2tYhzIy7qY/mBAKkMnVGu54Wg1O4FeVhyWwG1J9POs5i/lSdpUYNNOy6Fp0yJjU2jBZEl1Yqny1iu+Zrq1sOVcuede9iNSrih8Kng/sm3Aq2D4uyCfTwNFPr2R1PfbBCEarHqQiyL1G5fAl+A3+BcUHKiVbMmxCZvb7UTu5D2Ii8DQIDAQAB",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "identity",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://sheets.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "PASTE_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["core.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "core.js",
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true,
       "match_about_blank": true
     }
   ],
-  "action": { "default_popup": "popup.html", "default_title": "Spelling Catcher" }
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Spelling Catcher"
+  }
 }

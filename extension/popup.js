@@ -33,10 +33,40 @@ function render() {
       `</table>` : `<div class="empty">Nothing flagged.</div>`;
   }
   $('list').innerHTML = html;
+  renderSync();
 }
 
+function renderSync() {
+  const st = state.syncStatus || {};
+  const queued = (state.outbox || []).length;
+  const connected = st.state === 'ok' || st.state === 'error';
+  $('dot').className = 'dot ' + (st.state === 'ok' ? 'ok' : st.state === 'error' ? 'error' : '');
+  let text;
+  if (st.state === 'not-configured') text = 'Google sign-in not set up in this build';
+  else if (st.state === 'error') text = 'Sync error: ' + st.message;
+  else if (st.state === 'ok') {
+    const t = new Date(st.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    text = queued ? `${queued} waiting to sync` : `Synced ${t}`;
+  } else text = 'Not connected to Google Sheets';
+  $('status').textContent = text;
+  $('status').title = text;
+  $('connect').hidden = connected || st.state === 'not-configured';
+  $('disconnect').hidden = !connected;
+  $('open').hidden = !(connected && state.sheetUrl);
+  if (state.sheetUrl) $('open').href = state.sheetUrl;
+}
+
+$('connect').onclick = async () => {
+  $('connect').disabled = true;
+  $('connect').textContent = 'Connecting…';
+  await chrome.runtime.sendMessage({ kind: 'connect' });
+  $('connect').disabled = false;
+  $('connect').textContent = 'Connect Google';
+};
+$('disconnect').onclick = () => chrome.runtime.sendMessage({ kind: 'disconnect' });
+
 async function load() {
-  state = await chrome.storage.local.get(['corrections', 'flagged', 'paused', 'excludedSites']);
+  state = await chrome.storage.local.get(['corrections', 'flagged', 'paused', 'excludedSites', 'syncStatus', 'sheetUrl', 'outbox']);
   render();
 }
 

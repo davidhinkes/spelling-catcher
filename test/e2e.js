@@ -8,7 +8,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const EXT = path.join(__dirname, '../extension');
 const PAGE = `<!doctype html><textarea id="ta"></textarea>
 <div id="ce" contenteditable="true" style="min-height:40px;border:1px solid"></div>
-<input id="pw" type="password">`;
+<input id="pw" type="password">
+<input id="toggle" type="password"><button id="show" onclick="document.getElementById('toggle').type='text'">show</button>
+<input id="otp" type="text" autocomplete="one-time-code">`;
 
 (async () => {
   const server = http.createServer((_, res) => { res.setHeader('content-type', 'text/html'); res.end(PAGE); });
@@ -55,6 +57,13 @@ const PAGE = `<!doctype html><textarea id="ta"></textarea>
   // Password field must be ignored.
   await page.click('#pw');
   await type('#pw', 'hunter2 secrett ');
+  // "Show password" toggle: field flips to type=text but must stay ignored.
+  await page.click('#show');
+  await page.click('#toggle');
+  await type('#toggle', 'zorkmid ');
+  // One-time-code field marked by autocomplete.
+  await page.click('#otp');
+  await type('#otp', 'qwrtyp ');
   await page.click('#ta');
   await pause(2800); // let the content script flush
 
@@ -65,13 +74,18 @@ const PAGE = `<!doctype html><textarea id="ta"></textarea>
     data.corrections?.recieve?.fixes?.receive === 1 &&
     data.corrections?.definately?.fixes?.definitely === 1 &&
     data.flagged?.tommorow?.count === 1 &&
-    !data.flagged?.secrett && !data.flagged?.recieve;
+    !data.flagged?.secrett && !data.flagged?.recieve &&
+    !data.flagged?.zorkmid && !data.flagged?.qwrtyp &&
+    // Only corrections are queued for Google Sheets, and rows carry no site.
+    JSON.stringify((data.outbox || []).map(r => r.row.slice(2))) ===
+      JSON.stringify([['recieve', 'receive'], ['definately', 'definitely']]) &&
+    data.outbox.every(r => r.row.length === 4);
   console.log(ok ? 'E2E PASS' : 'E2E FAIL');
 
   // Render the popup for a visual check.
   const extId = sw.url().split('/')[2];
   const popup = await ctx.newPage();
-  await popup.setViewportSize({ width: 380, height: 300 });
+  await popup.setViewportSize({ width: 380, height: 340 });
   await popup.goto(`chrome-extension://${extId}/popup.html`);
   await popup.waitForTimeout(300);
   await popup.screenshot({ path: path.join(__dirname, '../docs/popup-corrected.png') });

@@ -23,6 +23,12 @@
   footer { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
   footer button { font: inherit; padding: 4px 8px; cursor: pointer; }
   label { display: flex; gap: 6px; align-items: center; }
+  .sync { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
+  .sync .status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sync button { font: inherit; padding: 4px 8px; cursor: pointer; }
+  .sync a { color: inherit; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: #2a9d4b; } .dot.error { background: #d33; }
 </style>
 </head>
 <body>
@@ -35,6 +41,13 @@
     <button id="tab-flagged">Flagged, not fixed <span id="n-flagged" class="muted"></span></button>
   </div>
   <div class="list" id="list"></div>
+  <section class="sync">
+    <span class="dot" id="dot"></span>
+    <span class="status muted" id="status">Not connected to Google Sheets</span>
+    <a id="open" href="#" target="_blank" hidden>Open sheet</a>
+    <button id="connect">Connect Google</button>
+    <button id="disconnect" class="x" hidden>Sign out</button>
+  </section>
   <footer>
     <button id="site">Ignore this site</button>
     <button id="md">Copy as Markdown</button>

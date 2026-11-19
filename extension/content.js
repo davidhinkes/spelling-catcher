@@ -22,11 +22,47 @@
 
   // Find the field an event belongs to: a textarea, a plain text input, or
   // the outermost contenteditable host.
+  // Fields that are, or ever were, password fields — catches "show password"
+  // toggles that flip type=password to type=text.
+  const everSecret = new WeakSet();
+  const SECRET_HINT = /pass|pwd|pin\b|otp|one-time|2fa|mfa|totp|verif|security|secret|token|api.?key|cvv|cvc|card.?num|cc-(num|csc)|ssn|account.?num|routing/i;
+
+  function looksSecret(el) {
+    if (everSecret.has(el)) return true;
+    if (el instanceof HTMLInputElement && el.type === 'password') { everSecret.add(el); return true; }
+    const hints = [
+      el.getAttribute('autocomplete'), el.name, el.id, el.getAttribute('aria-label'),
+      el.getAttribute('placeholder'), el.getAttribute('data-testid'),
+    ].filter(Boolean).join(' ');
+    if (hints && SECRET_HINT.test(hints)) { everSecret.add(el); return true; }
+    return false;
+  }
+
+  // Remember password inputs as soon as they exist, before any toggle.
+  function scanForPasswords(root) {
+    for (const el of root.querySelectorAll('input[type=password]')) everSecret.add(el);
+  }
+  scanForPasswords(document);
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === 'attributes' && m.target instanceof HTMLInputElement && m.oldValue === 'password') {
+        everSecret.add(m.target);
+      }
+      for (const n of m.addedNodes || []) if (n instanceof Element) {
+        if (n instanceof HTMLInputElement && n.type === 'password') everSecret.add(n);
+        else scanForPasswords(n);
+      }
+    }
+  }).observe(document.documentElement, {
+    subtree: true, childList: true, attributes: true, attributeFilter: ['type'], attributeOldValue: true,
+  });
+
   function fieldFor(node) {
     if (!(node instanceof Element)) node = node && node.parentElement;
     if (!node) return null;
-    if (node instanceof HTMLTextAreaElement) return node;
+    if (node instanceof HTMLTextAreaElement) return looksSecret(node) ? null : node;
     if (node instanceof HTMLInputElement) {
+      if (looksSecret(node)) return null;
       return TEXT_INPUT_TYPES.has(node.type) ? node : null;
     }
     if (!node.isContentEditable) return null;
