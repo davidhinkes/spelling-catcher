@@ -1,6 +1,5 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
-let tab = 'corrections';
 let state = {};
 let currentHost = null;
 
@@ -10,29 +9,18 @@ const esc = (s) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>
 
 function render() {
   const corrections = state.corrections || {};
-  const flagged = state.flagged || {};
-  $('n-corrections').textContent = Object.keys(corrections).length || '';
-  $('n-flagged').textContent = Object.keys(flagged).length || '';
-  $('tab-corrections').classList.toggle('on', tab === 'corrections');
-  $('tab-flagged').classList.toggle('on', tab === 'flagged');
+  $('n-corrections').textContent = Object.keys(corrections).length ? `· ${Object.keys(corrections).length} words` : '';
   $('paused').checked = !!state.paused;
   const excluded = (state.excludedSites || []).includes(currentHost);
   $('site').textContent = excluded ? 'Track this site again' : 'Ignore this site';
   $('site').disabled = !currentHost;
 
-  let html;
-  if (tab === 'corrections') {
-    const rows = sorted(corrections);
-    html = rows.length ? `<table><tr><th>Typed</th><th>Fixed to</th><th class="n">Times</th><th>Last</th></tr>` +
+  const rows = sorted(corrections);
+  $('list').innerHTML = rows.length
+    ? `<table><tr><th>Typed</th><th>Fixed to</th><th class="n">Times</th><th>Last</th></tr>` +
       rows.map(([w, c]) => `<tr><td class="wrong">${esc(w)}</td><td>${esc(topFix(c))}</td><td class="n">${c.count}</td><td class="muted">${c.last}</td></tr>`).join('') +
-      `</table>` : `<div class="empty">No corrections caught yet.<br>Misspell something, then fix it.</div>`;
-  } else {
-    const rows = sorted(flagged);
-    html = rows.length ? `<table><tr><th>Word</th><th class="n">Times</th><th></th></tr>` +
-      rows.map(([w, f]) => `<tr><td class="wrong">${esc(w)}</td><td class="n">${f.count}</td><td><button class="x" data-ignore="${esc(w)}">not a typo</button></td></tr>`).join('') +
-      `</table>` : `<div class="empty">Nothing flagged.</div>`;
-  }
-  $('list').innerHTML = html;
+      `</table>`
+    : `<div class="empty">No corrections yet.<br>Only words you misspell and then fix are kept.</div>`;
   renderSync();
 }
 
@@ -66,7 +54,7 @@ $('connect').onclick = async () => {
 $('disconnect').onclick = () => chrome.runtime.sendMessage({ kind: 'disconnect' });
 
 async function load() {
-  state = await chrome.storage.local.get(['corrections', 'flagged', 'paused', 'excludedSites', 'syncStatus', 'sheetUrl', 'outbox']);
+  state = await chrome.storage.local.get(['corrections', 'paused', 'excludedSites', 'syncStatus', 'sheetUrl', 'outbox']);
   render();
 }
 
@@ -74,15 +62,9 @@ function markdown() {
   const rows = sorted(state.corrections || {});
   const lines = ['| Misspelling | Correct | Count | Last seen |', '|---|---|---|---|'];
   for (const [w, c] of rows) lines.push(`| ${w} | ${topFix(c)} | ${c.count} | ${c.last} |`);
-  const flagged = sorted(state.flagged || {});
-  if (flagged.length) {
-    lines.push('', '**Flagged, never corrected:** ' + flagged.map(([w, f]) => `${w} (${f.count})`).join(', '));
-  }
   return lines.join('\n');
 }
 
-$('tab-corrections').onclick = () => { tab = 'corrections'; render(); };
-$('tab-flagged').onclick = () => { tab = 'flagged'; render(); };
 $('paused').onchange = (e) => chrome.storage.local.set({ paused: e.target.checked });
 
 $('site').onclick = async () => {
@@ -107,17 +89,10 @@ $('json').onclick = async () => {
 };
 
 $('clear').onclick = async () => {
-  if (!confirm('Clear all tracked misspellings? Settings and ignored words are kept.')) return;
-  await chrome.storage.local.remove(['corrections', 'flagged']);
+  if (!confirm('Clear the corrections list in this browser? Your Google Sheet is not changed.')) return;
+  await chrome.storage.local.remove(['corrections']);
 };
 
-$('list').onclick = async (e) => {
-  const w = e.target.dataset && e.target.dataset.ignore;
-  if (!w) return;
-  const { ignore = [], flagged = {} } = await chrome.storage.local.get(['ignore', 'flagged']);
-  delete flagged[w];
-  await chrome.storage.local.set({ ignore: [...new Set([...ignore, w])], flagged });
-};
 
 chrome.storage.onChanged.addListener(load);
 chrome.tabs.query({ active: true, currentWindow: true }, ([t]) => {

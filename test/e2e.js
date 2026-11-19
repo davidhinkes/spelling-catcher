@@ -38,7 +38,7 @@ const PAGE = `<!doctype html><textarea id="ta"></textarea>
   for (let i = 0; i < 8; i++) { await page.keyboard.press('Backspace'); await pause(120); }
   await type('#ta', 'receive it tommorow');
   await pause();
-  await page.keyboard.press('Enter'); // tommorow stays uncorrected -> flagged
+  await page.keyboard.press('Enter'); // tommorow is never fixed, so it must not be stored anywhere
 
   // Contenteditable: misspell, then fix by clicking back in (Home + arrows).
   await page.click('#ce');
@@ -73,9 +73,11 @@ const PAGE = `<!doctype html><textarea id="ta"></textarea>
   const ok =
     data.corrections?.recieve?.fixes?.receive === 1 &&
     data.corrections?.definately?.fixes?.definitely === 1 &&
-    data.flagged?.tommorow?.count === 1 &&
-    !data.flagged?.secrett && !data.flagged?.recieve &&
-    !data.flagged?.zorkmid && !data.flagged?.qwrtyp &&
+    // Nothing is kept unless the user fixed it: no unfixed-word list, no sites,
+    // nothing from the password / show-password / one-time-code fields.
+    !('flagged' in data) &&
+    Object.values(data.corrections).every(c => !('sites' in c)) &&
+    !/tommorow|secrett|zorkmid|qwrtyp|hunter/.test(JSON.stringify(data)) &&
     // Only corrections are queued for Google Sheets, and rows carry no site.
     JSON.stringify((data.outbox || []).map(r => r.row.slice(2))) ===
       JSON.stringify([['recieve', 'receive'], ['definately', 'definitely']]) &&
@@ -89,8 +91,6 @@ const PAGE = `<!doctype html><textarea id="ta"></textarea>
   await popup.goto(`chrome-extension://${extId}/popup.html`);
   await popup.waitForTimeout(300);
   await popup.screenshot({ path: path.join(__dirname, '../docs/popup-corrected.png') });
-  await popup.click('#tab-flagged');
-  await popup.screenshot({ path: path.join(require('os').tmpdir(), 'popup-flagged.png') });
 
   await ctx.close();
   server.close();

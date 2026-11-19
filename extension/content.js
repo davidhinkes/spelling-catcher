@@ -99,7 +99,8 @@
     if (text.length > MAX_TEXT) return;
     let t = trackers.get(el);
     if (!t) { t = new FieldTracker(); trackers.set(el, t); }
-    for (const ev of t.snapshot(text, caret)) queue.push(ev);
+    // Only edits to finished words leave this page; typed words are dropped here.
+    for (const ev of t.snapshot(text, caret)) if (ev.type === 'replace') queue.push(ev);
   }
 
   function flush() {
@@ -107,7 +108,7 @@
     const events = queue;
     queue = [];
     try {
-      chrome.runtime.sendMessage({ kind: 'events', host, events }).catch(() => {});
+      chrome.runtime.sendMessage({ kind: 'events', events }).catch(() => {});
     } catch (_) {
       // Extension was reloaded; this content script is orphaned.
     }

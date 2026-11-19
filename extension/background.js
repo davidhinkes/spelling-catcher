@@ -1,6 +1,7 @@
-// Judges word events against the dictionary, keeps running totals in
-// chrome.storage.local, and queues confirmed corrections for Google Sheets.
-// Only correction pairs (typed -> fixed) ever leave the machine.
+// Judges edit events against the dictionary. The only thing ever retained is a
+// correction the user made themselves: a misspelled word they changed into a
+// real one (typed -> fixed). Totals live in chrome.storage.local and the same
+// pairs are queued for Google Sheets. Nothing else is stored or sent.
 importScripts('core.js', 'sync.js');
 const { makeChecker } = self.SpellCore;
 const { makeSync, toRow } = self.SpellSync;
@@ -25,51 +26,38 @@ chrome.storage.onChanged.addListener((changes, area) => {
 let chain = Promise.resolve();
 function update(fn) {
   chain = chain.then(async () => {
-    const data = await chrome.storage.local.get(['corrections', 'flagged', 'outbox']);
+    const data = await chrome.storage.local.get(['corrections', 'outbox']);
     data.corrections = data.corrections || {};
-    data.flagged = data.flagged || {};
     data.outbox = data.outbox || [];
     if (fn(data) !== false) await chrome.storage.local.set(data);
   }).catch(err => console.error('spelling-catcher', err));
   return chain;
 }
 
-async function handle(host, events) {
+async function handle(events) {
   const checker = await getChecker();
   const today = new Date().toISOString().slice(0, 10);
-  const hits = [];
-  for (const ev of events) {
-    if (ev.type === 'replace' && checker.isCorrection(ev.from, ev.to)) {
-      hits.push({ kind: 'correction', wrong: ev.from.toLowerCase(), right: ev.to.toLowerCase() });
-    } else if (ev.type === 'typed' && checker.isTypo(ev.word)) {
-      hits.push({ kind: 'flag', word: ev.word.toLowerCase() });
-    }
-  }
+  const hits = events
+    .filter(ev => ev.type === 'replace' && checker.isCorrection(ev.from, ev.to))
+    .map(ev => ({ wrong: ev.from.toLowerCase(), right: ev.to.toLowerCase() }));
   if (!hits.length) return false;
-  let queued = false;
   await update((data) => {
     for (const h of hits) {
-      if (h.kind === 'correction') {
-        const c = data.corrections[h.wrong] ||= { count: 0, fixes: {}, sites: {}, first: today };
-        c.count++;
-        c.fixes[h.right] = (c.fixes[h.right] || 0) + 1;
-        c.sites[host] = (c.sites[host] || 0) + 1; // local only, for the popup
-        c.last = today;
-        data.outbox.push(toRow(h.wrong, h.right));
-        queued = true;
-        const f = data.flagged[h.wrong];
-        if (f && --f.count <= 0) delete data.flagged[h.wrong];
-      } else {
-        // Flagged-but-unfixed words stay on this machine: they could be names,
-        // jargon, or a letters-only secret typed into a plain field.
-        const f = data.flagged[h.word] ||= { count: 0, first: today };
-        f.count++;
-        f.last = today;
-      }
+      const c = data.corrections[h.wrong] ||= { count: 0, fixes: {}, first: today };
+      c.count++;
+      c.fixes[h.right] = (c.fixes[h.right] || 0) + 1;
+      c.last = today;
+      data.outbox.push(toRow(h.wrong, h.right));
     }
   });
-  return queued;
+  return true;
 }
+
+// Drop data kept by earlier versions (unfixed-word list, per-site counts).
+chrome.runtime.onInstalled.addListener(() => update((data) => {
+  chrome.storage.local.remove(['flagged', 'ignore']);
+  for (const c of Object.values(data.corrections)) delete c.sites;
+}));
 
 // ---- Google Sheets sync ----
 const clientId = (chrome.runtime.getManifest().oauth2 || {}).client_id || '';
@@ -95,7 +83,7 @@ chrome.runtime.onStartup.addListener(() => sheets.sync());
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg) return;
   if (msg.kind === 'events' && Array.isArray(msg.events)) {
-    handle(msg.host || 'unknown', msg.events).then((queued) => { if (queued) syncSoon(); });
+    handle(msg.events).then((queued) => { if (queued) syncSoon(); });
   } else if (msg.kind === 'connect') {
     sheets.sync({ interactive: true, force: true }).then(() => reply(true));
     return true;

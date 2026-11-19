@@ -21,9 +21,7 @@ That's it. The extension creates a **Spelling Catcher** sheet in your Drive with
 
 Only correction pairs — `recieve → receive` plus a timestamp — and only to your own Google Sheet. The extension asks for the `drive.file` scope, so it can see only the files it created, not the rest of your Drive.
 
-Never synced:
-- The text around a word, or what site you were on (both stay local, for the popup).
-- **Flagged-but-unfixed words.** A letters-only password typed into a plain field would look exactly like a misspelling, so these never leave the machine. A password essentially never gets "corrected" into a nearby dictionary word, which is why corrections are safe to sync.
+**Nothing is kept unless you act.** The only thing ever stored — locally or in the sheet — is a misspelled word *you* changed into a real one, by picking Chrome's suggestion or fixing it yourself. Field text is examined in memory while you type and discarded; words you never fix, the text around a word, and what site you were on are not stored anywhere. A password essentially never gets "corrected" into a nearby dictionary word, which is why this is a safe thing to keep.
 
 Never read at all:
 - `type=password` fields, **including after a "show password" toggle** flips them to text.
@@ -38,7 +36,7 @@ Chrome's built-in spellchecker doesn't expose results to extensions, so this run
 
 1. **`content.js`** watches textareas, plain text inputs and contenteditable fields (Gmail, claude.ai, Slack web, …) in every frame and takes a debounced snapshot of the text and caret position.
 2. **`core.js`** diffs consecutive snapshots at the word level. A word counts as *finished* once the caret leaves it. If a finished word is later edited into something else — the right-click suggestion, backspacing and retyping, or clicking back into it — that's a `replace` event. Enter (without Shift) and blur finish the last word, so chat boxes that clear on send are covered.
-3. **`background.js`** judges events against a Hunspell en_US word list. A **correction** is: the original wasn't a word, the result is, and they're within a small edit distance. Corrections go into an outbox.
+3. **`background.js`** receives only those edit events and judges them against a Hunspell en_US word list. A **correction** is: the original wasn't a word, the result is, and they're within a small edit distance. Anything else is dropped; corrections are counted locally and queued in an outbox.
 4. **`sync.js`** appends the outbox to the sheet via the Sheets API (15 s after a correction, and every 5 min), recreating the sheet if you delete it.
 
 ## Developer setup (one time)
