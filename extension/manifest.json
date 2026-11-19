@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Spelling Catcher",
+  "version": "0.1.0",
+  "description": "Tracks the words you misspell and then correct, everywhere you type in Chrome. Everything stays local.",
+  "permissions": ["storage", "activeTab"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["core.js", "content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "Spelling Catcher" }
+}

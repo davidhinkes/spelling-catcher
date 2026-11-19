@@ -1,0 +1,14 @@
+{
+  "name": "spelling-catcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension that tracks the words you misspell and then correct.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "e2e": "node test/e2e.js",
+    "build:dict": "node build/expand-dict.js /usr/share/hunspell/en_US.aff /usr/share/hunspell/en_US.dic > extension/words.txt"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
